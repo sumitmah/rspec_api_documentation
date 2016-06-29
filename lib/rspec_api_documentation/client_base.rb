@@ -39,8 +39,14 @@ module RspecApiDocumentation
     private
 
     def process(method, path, params = {}, headers ={})
-      do_request(method, path, params, headers)
-      document_example(method.to_s.upcase, path)
+      begin
+        do_request(method, path, params, headers)
+        document_example(method.to_s.upcase, path, true)
+      rescue => ex
+        document_example(method.to_s.upcase, path, false)
+        raise ex
+      end
+
     end
 
     def read_request_body
@@ -49,7 +55,7 @@ module RspecApiDocumentation
       input.read
     end
 
-    def document_example(method, path)
+    def document_example(method, path, document_response=true)
       return unless metadata[:document]
 
       request_body = read_request_body
@@ -66,11 +72,15 @@ module RspecApiDocumentation
       request_metadata[:request_headers] = request_headers
       request_metadata[:request_query_parameters] = query_hash
       request_metadata[:request_content_type] = request_content_type
-      request_metadata[:response_status] = status
-      request_metadata[:response_status_text] = Rack::Utils::HTTP_STATUS_CODES[status]
-      request_metadata[:response_body] = record_response_body(response_content_type, response_body)
-      request_metadata[:response_headers] = response_headers
-      request_metadata[:response_content_type] = response_content_type
+
+      if document_response
+        request_metadata[:response_status] = status
+        request_metadata[:response_status_text] = Rack::Utils::HTTP_STATUS_CODES[status]
+        request_metadata[:response_body] = record_response_body(response_content_type, response_body)
+        request_metadata[:response_headers] = response_headers
+        request_metadata[:response_content_type] = response_content_type
+      end
+
       request_metadata[:curl] = Curl.new(method, path, request_body, request_headers)
 
       metadata[:requests] ||= []
